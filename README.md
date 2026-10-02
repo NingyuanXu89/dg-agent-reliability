@@ -29,7 +29,32 @@ Record success for each task and run, together with regressions, runtime, cost w
 
 ## Project status
 
-This repository currently contains this README only. Solver code, tests, and an experiment harness have not been added.
+A from-scratch DG solver for periodic 1D **inviscid Burgers' equation** $u_t + (u^2/2)_x = 0$ is in `dg_burgers/` (numpy only; no PDE/DG libraries). The experiment harness for the reliability questions above has not been added yet.
+
+- **Method:** modal Legendre basis of degree p, exact Godunov flux (Rusanov optional), SSP-RK3, and an optional TVB minmod slope limiter (Cockburn–Shu).
+- **Test problem:** $u_0 = 0.5 + \sin x$ on $[0, 2\pi)$. The breaking time is $t_s = 1$, and the shock forms at $x = \pi + 0.5$, then moves at speed 0.5.
+- **Exact references:** characteristics give the exact solution for $t < t_s$. For any $t$, the exact entropy solution comes from symmetry in the frame moving at speed 0.5.
+
+| Path | Contents |
+|---|---|
+| `dg_burgers/basis.py` | Legendre basis, Gauss quadrature |
+| `dg_burgers/solver.py` | `DGBurgers`: projection, DG right-hand side, fluxes, limiter, SSP-RK3 |
+| `dg_burgers/exact.py` | characteristic and entropy exact solutions, breaking time |
+| `dg_burgers/diagnostics.py` | error norms, observed orders, mass and energy |
+| `scripts/run_convergence.py` | convergence tables and error-diagnosis plots → `results/` |
+| `scripts/make_movie.py` | movie of the solution steepening into a shock → `results/burgers_shock.mp4` |
+| `tests/test_dg_burgers.py` | pytest suite |
+
+## How to run
+
+```bash
+uv venv .venv && uv pip install -r requirements.txt --python .venv/bin/python
+.venv/bin/python -m pytest -q
+.venv/bin/python scripts/run_convergence.py
+.venv/bin/python scripts/make_movie.py
+```
+
+The movie needs `ffmpeg` on PATH. Without it, the script falls back to an animated GIF.
 
 ## References
 
