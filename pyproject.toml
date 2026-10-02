@@ -1,0 +1,13 @@
+[project]
+name = "dgburgers"
+version = "0.1.0"
+description = "Discontinuous Galerkin solver for the 1-D inviscid Burgers equation"
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy", "matplotlib"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
