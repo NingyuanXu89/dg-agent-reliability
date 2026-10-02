@@ -1,0 +1,16 @@
+{
+  "p": 2,
+  "K": 128,
+  "t_end": 1.3,
+  "frames": 131,
+  "steps": 780,
+  "t_shock_exact": 1.0,
+  "t_first_limiter_activation": 0.9539270045056938,
+  "t_gradient_below_90pct_exact": 0.9339269981863983,
+  "max_grad_numerical": 36.99053650395668,
+  "L1_error_t_end": 0.027290047817265798,
+  "files": [
+    "burgers_shock.mp4",
+    "burgers_shock.gif"
+  ]
+}

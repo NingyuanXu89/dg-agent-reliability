@@ -1,0 +1,19 @@
+[project]
+name = "burgers-dg"
+version = "0.1.0"
+description = "From-scratch discontinuous Galerkin experiment for the inviscid Burgers equation"
+requires-python = ">=3.10"
+# Versions used to produce the committed results/ (Python 3.12.14).
+dependencies = [
+    "numpy>=2.0",       # tested with 2.5.3
+    "scipy>=1.11",      # tested with 1.18.1 (used only in tests as an independent root finder)
+    "matplotlib>=3.8",  # tested with 3.11.2
+    "pillow>=10",       # tested with 12.3.0 (GIF writer)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]  # tested with 9.1.1
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
