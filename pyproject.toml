@@ -1,0 +1,13 @@
+[project]
+name = "burgers-dg"
+version = "0.1.0"
+description = "From-scratch discontinuous Galerkin solver and experiments for the periodic inviscid Burgers equation"
+requires-python = ">=3.9"
+dependencies = ["numpy", "matplotlib", "pillow"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

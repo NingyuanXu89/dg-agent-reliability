@@ -1,0 +1,19 @@
+{
+  "degree": 2,
+  "cells": 100,
+  "tvb_M": 26.31894506957162,
+  "shock_time_exact": 0.15915494309189535,
+  "shock_time_estimated_from_gradient": 0.15876248849398664,
+  "shock_time_relative_error": 0.002465864963315073,
+  "shock_location_exact": 0.5795774715459476,
+  "first_limiter_activation_time": 0.08753521870054243,
+  "max_mass_drift": 4.496403249731884e-15,
+  "energy_initial": 0.3749999999998475,
+  "energy_final": 0.33821468105608504,
+  "L1_error_at": {
+    "0.5 t_s": 4.0174700937263484e-06,
+    "0.9 t_s": 4.4731280500788384e-05,
+    "1.0 t_s": 0.0014542182194406074
+  },
+  "L1_error_final": 0.003482401323173321
+}
