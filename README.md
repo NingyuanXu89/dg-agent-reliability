@@ -1,4 +1,4 @@
-# DG Burgers: solver, convergence, and shock movie
+# From-scratch DG: Burgers and 2D compressible hydrodynamics
 
 A from-scratch numerical PDE exercise for an agentic coding workshop. The solver uses **modal Discontinuous Galerkin (DG)**, a local Lax–Friedrichs interface flux, and explicitly implemented SSP Runge–Kutta time stepping. No PDE solver or finite-element library is used.
 
@@ -138,3 +138,89 @@ The numerical code here is original and uses only basic numerical/plotting packa
 
 - [Cockburn and Shu: TVB Runge–Kutta DG framework](https://doi.org/10.1090/S0025-5718-1989-0983311-4)
 - [DG advection lecture](https://www.geophysik.uni-muenchen.de/~igel/Lectures/Book/SS19/08_DiscontinuousGalerkinMethod/dg.pdf)
+
+
+## 2D ideal compressible Euler solver
+
+The separate `dg_euler` package solves the nondimensional ideal-gas Euler system on a periodic unit square:
+
+$$
+U_t+F(U)_x+G(U)_y=0,\qquad U=(\rho,m_x,m_y,E),
+$$
+$$
+P=(\gamma-1)\left(E-\frac{m_x^2+m_y^2}{2\rho}\right),\quad
+F=(m_x,m_xv_x+P,m_yv_x,(E+P)v_x),
+$$
+$$
+G=(m_y,m_xv_y,m_yv_y+P,(E+P)v_y).
+$$
+
+Coefficients have shape `(ny,nx,mode_y,mode_x,4)`; mode `(0,0)` stores each conservative cell mean. The polynomial space is tensor-product Legendre of degree 1 or 2 in each coordinate. On a cell of widths $\Delta x,\Delta y$, the diagonal mass entries are $\Delta x\Delta y/[(2i+1)(2j+1)]$. Integration by parts gives volume terms $\int F\partial_x\phi+G\partial_y\phi$ minus the outward numerical-flux boundary integral. Each periodic face uses one shared flux, so cell-mean residuals telescope for mass, both momenta, and energy.
+
+Volume and face integrals use `p+2` Gauss–Legendre points per coordinate. This is overintegration; rational Euler fluxes are not integrated exactly. HLLC includes tangential momentum and uses outer wave bounds from both states. Degenerate or inadmissible intermediate states, including nonpositive contact pressure, fall back to local Lax–Friedrichs; fallback counts are recorded. See [Athena's Riemann solver guidance](https://princetonuniversity.github.io/Athena-Cversion/AthenaDocsUGRiemann.html). The alternative `--flux llf` is available.
+
+The unsplit residual advances with explicitly implemented SSPRK3. The time step is
+
+$$
+\Delta t\le\frac{\mathrm{CFL}}{(2p+1)\max[(|v_x|+c)/\Delta x+(|v_y|+c)/\Delta y]},\qquad c=\sqrt{\gamma P/\rho}.
+$$
+
+Speeds are checked at volume and face quadrature nodes, with additional Lobatto sampling. Output times truncate the last step. Default CFL is 0.15.
+
+### Stabilization
+
+After each RK stage, directional TVB minmod detects troubled cells from face-averaged endpoint deviations and differences of neighboring conservative means. The TVB exemption is $Mh^2$ times a local component scale `max(1,abs(neighboring means))`, with default $M=50$. A flagged cell retains minmod-limited linear x/y modes and discards mixed and higher modes. Every conservative mean is preserved.
+
+Conservative positivity scaling then contracts nonconstant modes toward the unchanged mean. Density is scaled analytically; pressure uses bisection. The optional native kernel first uses conservative component bounds based on $|P_iP_j|\le1$ to skip nodal reconstruction in cells whose full polynomial is already safely admissible; otherwise it performs the same nodal checks and scaling. Density and pressure floors are $10^{-12}$, sampled at volume/face Gauss nodes and tensor-product Gauss–Lobatto nodes. An inadmissible mean is never repaired by clipping. Failed stages retry the previous valid state with a halved step, at most eight retries. A terminal failure writes `failure_state.npz` and `failure.json` when an output directory is supplied. These checks demonstrate sampled positivity and empirical stability; no global positivity or discrete entropy theorem is asserted.
+
+### Tanh Kelvin–Helmholtz setup
+
+This is a tanh variant of the classic double-shear test, with an exactly periodic profile:
+
+$$
+S(y)=\tfrac12\left[1+\tanh\left(\frac{-\cos(2\pi y)}{2\pi a}\right)\right],\qquad a=0.025,
+$$
+$$
+\rho=1+S,\quad v_x=0.5-S,\quad v_y=0.01\sin(4\pi x),\quad P=2.5,\quad\gamma=5/3.
+$$
+
+Interfaces are centered at $y=0.25,0.75$; locally $a$ is the tanh scale. Total energy is constructed from these primitive fields. The main run is 64² cells with degree 2 through $t=3$; comparison runs use 32² and 128² cells with identical physical parameters.
+
+```sh
+python -m dg_euler khi --nx 64 --degree 2 --final-time 3 --output outputs/khi/n64
+python -m dg_euler validate
+python -m dg_euler movie --output outputs/khi/n64
+python -m dg_euler demo
+```
+
+`demo` generates the smooth convergence and Sod validations, three KHI resolutions, the 64² half-step comparison through $t=1$, a numerical report, plots, MP4, and GIF. Completed run directories are reused. For a fresh run or different parameters, use a new `--output` directory. The 128² DG run is computationally substantial. The CLI optionally compiles the included from-scratch C kernels with an existing C compiler and loads them using standard-library `ctypes`; it installs no packages and changes no environment. A missing compiler or unavailable local kernel falls back to NumPy. Set `DG_EULER_NATIVE=0` to select NumPy explicitly. Native/NumPy agreement is tested, including stabilization. Compiled files live under ignored `outputs/khi/native/`. The Python API uses a previously built kernel when available; `simulate(..., accelerated=False)` selects NumPy. `simulate(..., resume=True)` continues from selected modal checkpoints when the configuration and output schedule match. Options include `--nx`, `--ny`, `--degree`, `--gamma`, `--final-time`, `--cfl`, `--tvb`, `--layer-width`, `--perturbation`, and `--flux`.
+
+Python API:
+
+```python
+from dg_euler import EulerConfig, EulerDG, simulate
+config = EulerConfig(nx=32, ny=32, final_time=0.1)
+result = simulate(config, output="outputs/khi/short", movie_fields=True)
+modal_state = result["coefficients"]
+```
+
+### Diagnostics and outputs
+
+All generated files are ignored beneath `outputs/khi/`:
+
+- `report.md`, `acceptance.json`, `khi_summary.csv`, `resolution_differences.csv`, `time_step_sensitivity.json`, and `diagnostics.png` contain measured results.
+- Each resolution directory contains `config.json`, `diagnostics.json`/CSV, conservative cell means at output times, selected modal checkpoints, and the final modal state. Full modal snapshots are not accumulated in memory.
+- The main `n64/frames/` directory stores 151 reconstructed density/vorticity fields, from $t=0$ to 3. `khi.mp4` and `khi.gif` use 20 fps (7.55 s); representative frame PNGs and `movie_metadata.json` support inspection.
+- `validation/` contains smooth errors and refinement rates, half-step temporal discrepancies, and x/y Sod-strip errors against an independently implemented exact 1D Euler Riemann solution. Smooth tests advect density $1+0.2\sin[2\pi(x+y-0.5t)]$ with velocity `(0.3,0.2)` and pressure 1 through $t=0.1$, with TVB disabled. Finest-grid L² rates must be within 0.4 of $p+1$. Sod comparisons integrate the central interval `[0.25,0.75]` at $t=0.1$, before periodic-edge waves enter it.
+
+Conservation drift divides each total difference by `max(1,abs(initial_total))`; acceptance requires its maximum below $10^{-9}$. The seeded amplitude is
+
+$$
+A_2(t)=\frac{2|\int \rho v_y e^{-4\pi i x}\,dx\,dy|}{\int \rho\,dx\,dy}.
+$$
+
+The report fits log-amplitude over $t\in[0.2,0.6]$ and compares full amplitude histories. This interval can contain an initial transient; its fitted slope is not automatically a linear instability growth rate. Transverse kinetic energy, sampled minimum density/pressure, cumulative limiter cell-stage counts, positivity scaling, HLLC fallbacks, and rejected steps are also recorded. Fine-grid density means are conservatively restricted before resolution comparisons.
+
+Vorticity uses analytical within-cell modal derivatives and the quotient rule to convert conservative fields to velocity derivatives, $\omega=\partial_x v_y-\partial_y v_x$. Contributions at interface derivative jumps are omitted. The movie uses one density color range and one symmetric logarithmic vorticity scale derived from all frames, so changing colors do not masquerade as physical growth.
+
+The 128² run is a comparison, not an exact solution. Without specified physical viscosity/diffusion, late-time inviscid small-scale structure is not claimed to be converged; see [McNally, Lyra & Passy (2012)](https://arxiv.org/abs/1111.1764). Resolution and time-step differences measure sensitivity of this particular numerical experiment.
